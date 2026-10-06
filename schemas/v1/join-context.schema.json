@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/BREAKGameStudios/BREAK-RIFT-RCM/schemas/v1/join-context.schema.json",
+  "title": "RIFT join context",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "context_id",
+    "session_id",
+    "required_build_id"
+  ],
+  "properties": {
+    "context_id": {
+      "$ref": "common.schema.json#/$defs/opaqueId"
+    },
+    "session_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "invitation_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "required_build_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    }
+  }
+}

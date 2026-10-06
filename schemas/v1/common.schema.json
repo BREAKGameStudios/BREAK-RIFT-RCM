@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/BREAKGameStudios/BREAK-RIFT-RCM/schemas/v1/common.schema.json",
+  "title": "RIFT Local Protocol v1 common types",
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "opaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "publicId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "username": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32
+    },
+    "gameSlug": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "cursor": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    }
+  }
+}

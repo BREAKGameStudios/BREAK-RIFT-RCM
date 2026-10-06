@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/BREAKGameStudios/BREAK-RIFT-RCM/schemas/v1/invite.schema.json",
+  "title": "RIFT game invitation",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "invitation_id",
+    "session_id",
+    "game_slug",
+    "game_title",
+    "inviter_public_id",
+    "inviter_username",
+    "recipient_public_id",
+    "recipient_username",
+    "status",
+    "expires_at",
+    "created_at"
+  ],
+  "properties": {
+    "invitation_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "session_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "game_slug": {
+      "$ref": "common.schema.json#/$defs/gameSlug"
+    },
+    "game_title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "inviter_public_id": {
+      "$ref": "common.schema.json#/$defs/publicId"
+    },
+    "inviter_username": {
+      "$ref": "common.schema.json#/$defs/username"
+    },
+    "recipient_public_id": {
+      "$ref": "common.schema.json#/$defs/publicId"
+    },
+    "recipient_username": {
+      "$ref": "common.schema.json#/$defs/username"
+    },
+    "status": {
+      "enum": [
+        "pending",
+        "accepted",
+        "declined",
+        "cancelled",
+        "expired"
+      ]
+    },
+    "expires_at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "created_at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "responded_at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    }
+  }
+}

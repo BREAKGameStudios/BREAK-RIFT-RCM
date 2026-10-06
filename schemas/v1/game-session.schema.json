@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/BREAKGameStudios/BREAK-RIFT-RCM/schemas/v1/game-session.schema.json",
+  "title": "RIFT game session",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "session_id",
+    "game_slug",
+    "build_id",
+    "host_public_id",
+    "host_username",
+    "map_id",
+    "mode_id",
+    "current_players",
+    "max_players",
+    "state",
+    "joinable",
+    "friends_only",
+    "revision",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "session_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "game_slug": {
+      "$ref": "common.schema.json#/$defs/gameSlug"
+    },
+    "build_id": {
+      "$ref": "common.schema.json#/$defs/uuid"
+    },
+    "host_public_id": {
+      "$ref": "common.schema.json#/$defs/publicId"
+    },
+    "host_username": {
+      "$ref": "common.schema.json#/$defs/username"
+    },
+    "map_id": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "mode_id": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "current_players": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1024
+    },
+    "max_players": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1024
+    },
+    "state": {
+      "enum": [
+        "open",
+        "closed"
+      ]
+    },
+    "joinable": {
+      "type": "boolean"
+    },
+    "friends_only": {
+      "type": "boolean"
+    },
+    "connection_string": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "created_at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    }
+  }
+}

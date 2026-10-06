@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/BREAKGameStudios/BREAK-RIFT-RCM/schemas/v1/session.schema.json",
+  "title": "RIFT local identity session response",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "protocol_version",
+    "authenticated"
+  ],
+  "properties": {
+    "protocol_version": {
+      "const": 1
+    },
+    "authenticated": {
+      "type": "boolean"
+    },
+    "public_id": {
+      "$ref": "common.schema.json#/$defs/publicId"
+    },
+    "username": {
+      "$ref": "common.schema.json#/$defs/username"
+    },
+    "ticket": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "ticket_expires_at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "game": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "slug",
+        "build_id"
+      ],
+      "properties": {
+        "slug": {
+          "$ref": "common.schema.json#/$defs/gameSlug"
+        },
+        "build_id": {
+          "$ref": "common.schema.json#/$defs/uuid"
+        }
+      }
+    },
+    "join_context": {
+      "$ref": "join-context.schema.json"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "authenticated": {
+            "const": true
+          }
+        },
+        "required": [
+          "authenticated"
+        ]
+      },
+      "then": {
+        "required": [
+          "public_id",
+          "username"
+        ]
+      },
+      "else": {
+        "not": {
+          "anyOf": [
+            { "required": ["ticket"] },
+            { "required": ["game"] },
+            { "required": ["join_context"] }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "game"
+        ]
+      },
+      "then": {
+        "required": [
+          "ticket",
+          "ticket_expires_at"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "join_context"
+        ]
+      },
+      "then": {
+        "required": [
+          "game"
+        ]
+      }
+    }
+  ]
+}
