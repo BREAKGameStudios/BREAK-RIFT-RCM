@@ -1,1 +1,42 @@
+name: Protocol conformance
 
+"on":
+  push:
+    paths:
+      - "docs/protocol/**"
+      - "schemas/**"
+      - "tests/protocol/**"
+      - ".github/workflows/protocol-tests.yml"
+  pull_request:
+    paths:
+      - "docs/protocol/**"
+      - "schemas/**"
+      - "tests/protocol/**"
+      - ".github/workflows/protocol-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-protocol:
+    name: Validate RIFT Local Protocol v1
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: tests/protocol/requirements.txt
+
+      - name: Install test dependencies
+        run: python -m pip install --requirement tests/protocol/requirements.txt
+
+      - name: Run protocol conformance tests
+        run: python tests/protocol/validate.py
