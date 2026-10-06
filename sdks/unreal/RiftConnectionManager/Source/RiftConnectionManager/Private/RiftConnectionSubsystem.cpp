@@ -224,6 +224,20 @@ void URiftConnectionSubsystem::CompleteSessionRequest(
 
     bSessionLoading = false;
     CachedSession = Session;
+
+    UE_LOG(
+        LogTemp,
+        Log,
+        TEXT(
+            "RCM: session received authenticated=%s username=%s has_game=%s game_slug=%s build_id=%s"
+        ),
+        CachedSession.bAuthenticated ? TEXT("true") : TEXT("false"),
+        *CachedSession.Username,
+        CachedSession.bHasGame ? TEXT("true") : TEXT("false"),
+        *CachedSession.Game.Slug,
+        *CachedSession.Game.BuildId
+    );
+
     OnSessionChanged.Broadcast(CachedSession);
 }
 
@@ -239,6 +253,14 @@ void URiftConnectionSubsystem::FailSessionRequest(
     }
 
     bSessionLoading = false;
+
+    UE_LOG(
+        LogTemp,
+        Warning,
+        TEXT("RCM: session request failed code=%s message=%s"),
+        *Code,
+        *Message
+    );
 
     FRiftConnectionError Error;
     Error.Code = Code;
