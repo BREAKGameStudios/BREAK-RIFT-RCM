@@ -1,0 +1,22 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0",
+  "FriendlyName": "RIFT Connection Manager",
+  "Description": "Connects Unreal Engine games to BREAK RIFT through the RIFT Local Protocol.",
+  "Category": "Online Platform",
+  "CreatedBy": "BREAK Game Studios",
+  "CreatedByURL": "https://github.com/BREAKGameStudios",
+  "DocsURL": "https://github.com/BREAKGameStudios/BREAK-RIFT-RCM",
+  "SupportURL": "https://github.com/BREAKGameStudios/BREAK-RIFT-RCM/issues",
+  "CanContainContent": false,
+  "IsBetaVersion": true,
+  "Installed": false,
+  "Modules": [
+    {
+      "Name": "RiftConnectionManager",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ]
+}
