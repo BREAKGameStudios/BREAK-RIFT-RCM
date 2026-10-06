@@ -1,7 +1,7 @@
 # RIFT Local Protocol v1
 
-Status: draft for implementation review
-Product: RIFT Connection Manager (RCM)
+Status: draft for implementation review  
+Product: RIFT Connection Manager (RCM)  
 Protocol version: `1`
 
 ## 1. Purpose
@@ -182,6 +182,21 @@ Request:
 
 `connection_string` is omitted from searches and unauthorized reads. It is returned only after an authorized join or to an authorized participant.
 
+### Session invariants
+
+The backend enforces the following invariants independently of launcher or SDK behavior:
+
+- An account may host at most one open session for a given game.
+- An account may belong to at most one active session for a given game.
+- Creating a host session is idempotent for the same account and active game. When an open hosted session already exists, the operation returns that session instead of creating a duplicate.
+- Joining a session performs an atomic membership transition. Any previous non-host membership for the same game is removed before the new membership is inserted.
+- If the account currently hosts another open session for the same game, joining a different session closes the hosted session, invalidates its pending invitations, notifies its participants, and then inserts the new membership in the same logical operation.
+- A failed transition leaves the previous valid membership unchanged.
+- Session capacity includes the host.
+- Closing a session removes its active memberships after marking the session closed and invalidating pending invitations and join contexts.
+
+These rules prevent one account from appearing in multiple active matches for the same game and make retries converge on one authoritative state.
+
 ## 8. Hosting
 
 ### `POST /sessions/host`
@@ -235,7 +250,7 @@ Returns a visible session. `connection_string` is included only when the account
 
 ### `POST /sessions/{session_id}/join`
 
-The backend validates game identity, entitlement, visibility, capacity, state, and existing membership. Success returns an authorized connection context:
+The backend validates game identity, entitlement, visibility, capacity, state, and existing membership. Joining the session performs the atomic membership transition defined by the session invariants. Repeating the operation for the already active target session returns the current authorized context rather than creating another membership. Success returns an authorized connection context:
 
 ```json
 {
@@ -283,11 +298,11 @@ Returns invitations visible to the authenticated account. By default, returns pe
 }
 ```
 
-The backend derives the game from the authenticated sender's `playing` presence and derives or validates the sender's active hosted session. Only accepted friends may be invited. Offline friends may receive invitations. Success returns `201` with the invitation.
+The backend derives the game from the authenticated sender's `playing` presence and validates the sender's active session membership. The host may invite friends. A non-host participant may also invite friends while the session is open and joinable. Only accepted friends may be invited. Offline friends may receive invitations. Success returns `201` with the invitation.
 
 ### `POST /invites/{invitation_id}/accept`
 
-Only the recipient may accept. The backend revalidates expiry, session state, game entitlement, capacity, friendship, blocks, and membership. It atomically accepts the invitation and adds the recipient to the session. The launcher persists the returned join context. Success returns the authorized session and join context.
+Only the recipient may accept. The backend revalidates expiry, session state, game entitlement, capacity, friendship, blocks, and membership. It atomically performs the membership transition, marks the invitation accepted, and creates the authorized join context. If any part fails, the invitation remains pending when it is still valid and the previous membership remains unchanged. The launcher persists the returned join context. Success returns the authorized session and join context.
 
 ### `POST /invites/{invitation_id}/decline`
 
@@ -380,3 +395,4 @@ The plugin also contains optional server-side ticket validation and a multiplaye
 - Invitation acceptance and membership insertion are atomic.
 - Ticket validation consumes the ticket on first successful use.
 - Blocks deliberately hide interaction targets as not found where appropriate.
+
