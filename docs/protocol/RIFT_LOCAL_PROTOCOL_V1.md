@@ -62,11 +62,41 @@ The file is replaced atomically when the launcher starts listening. The launcher
 - The port is dynamically assigned.
 - Requests use HTTP/1.1 and JSON encoded as UTF-8.
 - Every operation requires `X-Rift-Secret`.
+- Game-bound operations also require `X-Rift-Launch-Token`.
 - The secret is generated when the launcher starts and is invalid after that launcher instance stops.
 - The secret authenticates access to the local launcher; it is not an account token and must never be forwarded remotely.
+- The launch token identifies one process launch performed by RIFT. It is not written to `launcher.json`.
 - A missing or incorrect secret returns `403`.
 - Unsupported paths return `404`.
 - Unsupported methods return `405`.
+
+### Active-game identification
+
+When RIFT starts a game, it creates a cryptographically random launch token and injects these environment variables into the game process:
+
+```text
+RIFT_LAUNCH_ID=<opaque launch identifier>
+RIFT_LAUNCH_TOKEN=<opaque random token>
+```
+
+The RCM SDK reads them internally and sends the token as `X-Rift-Launch-Token`. Game code never reads, stores, logs, or configures this value.
+
+The launcher stores an in-memory launch record containing:
+
+- launch identifier;
+- hash of the launch token;
+- catalog game identifier and slug;
+- published build identifier;
+- canonical executable path;
+- process identifier;
+- account identifier;
+- start time and process state.
+
+The launcher derives this record from the installed receipt and catalog data before starting the process. The game cannot submit or override its slug. A valid launch token authorizes operations only for the game, account, and process launch to which it was issued.
+
+Child processes intentionally created by the game may inherit the environment. They remain part of the same logical launch. The launcher revokes the launch token when the tracked game process tree ends, the account logs out, or the launcher explicitly terminates the launch context.
+
+The discovery secret proves access to the current local launcher. The launch token proves association with a RIFT-launched game. Both are required for `/session` to issue a game-scoped ticket or expose game and join context, and for all `/sessions` and `/invites` operations.
 
 ## 5. Common response and error format
 
@@ -91,6 +121,7 @@ Stable local error codes:
 | `invalid_request` | 400 | Malformed JSON or invalid field. |
 | `unsupported_protocol` | 400 | SDK and launcher have incompatible protocol versions. |
 | `local_forbidden` | 403 | Missing or invalid local secret. |
+| `invalid_launch` | 403 | Missing, expired, or invalid game launch token. |
 | `not_authenticated` | 401 | No authenticated RIFT account. |
 | `no_active_game` | 409 | The launcher has no active RIFT-launched game. |
 | `wrong_game` | 403 | The operation does not belong to the active game. |
@@ -123,16 +154,18 @@ Returns the current identity and creates a new disposable game ticket when authe
   "username": "sen11k",
   "ticket": "opaque-disposable-ticket",
   "game": {
-    "slug": "overrun-blitzkrieg"
+    "slug": "overrun-blitzkrieg",
+    "build_id": "uuid"
   },
   "join_context": {
+    "context_id": "opaque-context-identifier",
     "session_id": "uuid",
     "invitation_id": "uuid"
   }
 }
 ```
 
-Required fields are `protocol_version` and `authenticated`. When `authenticated` is true, `public_id`, `username`, and `ticket` are required. `game` and `join_context` are optional.
+Required fields are `protocol_version` and `authenticated`. When `authenticated` is true, `public_id` and `username` are required. When a valid launch token is present, `ticket` and `game` are also required. `join_context` is optional. A request without a launch token may retrieve identity but receives no game ticket, game, or join context. A request that supplies an invalid or expired launch token fails with `403 invalid_launch`.
 
 When no account is authenticated, the endpoint returns `200`:
 
@@ -143,7 +176,7 @@ When no account is authenticated, the endpoint returns `200`:
 }
 ```
 
-Each authenticated call issues a fresh single-use ticket. Issuing a fresh ticket may invalidate an older unused ticket for the same account. SDK consumers must reject out-of-order responses and must not reuse a submitted ticket.
+Each authenticated, game-bound call issues a fresh single-use ticket bound to the account, catalog game, build, and launch context. Issuing a fresh ticket may invalidate an older unused ticket for the same account and game. SDK consumers must reject out-of-order responses and must not reuse a submitted ticket.
 
 Calling this endpoint does not consume `join_context`.
 
@@ -155,12 +188,17 @@ Request:
 
 ```json
 {
+  "context_id": "opaque-context-identifier",
   "session_id": "uuid",
   "invitation_id": "uuid"
 }
 ```
 
-`invitation_id` is optional when the player joined without an invitation. The launcher clears the context only when the supplied identifiers match the stored context. Success returns `204`.
+`invitation_id` is optional when the player joined without an invitation. The launcher clears the context only when `context_id`, `session_id`, the authenticated account, and the active game all match the stored context. A stale game instance cannot consume a replacement context. Success returns `204`.
+
+### `DELETE /session/join-context`
+
+Cancels the pending context for the authenticated account and active game. The launcher leaves the backend session when appropriate, then clears the local context. Success returns `204`. User confirmation belongs to the launcher or game UI, not to this transport operation.
 
 ## 7. Session representation
 
@@ -314,7 +352,25 @@ Only the inviter may cancel a pending invitation. Success returns `204`.
 
 ## 12. Pending join context lifecycle
 
-The launcher persists one pending join context per authenticated account. It survives installation, update, repair, process startup, SDK initialization, launcher restart when the account session remains valid, and repeated `GET /session` calls.
+The launcher persists at most one pending join context per authenticated account. A context contains only identifiers and lifecycle metadata:
+
+```json
+{
+  "context_id": "opaque-context-identifier",
+  "account_id": "internal-account-identifier",
+  "game_slug": "overrun-blitzkrieg",
+  "session_id": "uuid",
+  "invitation_id": "uuid",
+  "created_at": "2026-10-05T20:45:00Z",
+  "expires_at": "2026-10-05T21:00:00Z"
+}
+```
+
+`invitation_id` is optional. The connection string and disposable game ticket are not persisted. When the SDK requests the session, the launcher refreshes authorized connection data from the backend and issues a fresh ticket.
+
+The context is written atomically to launcher-owned application data. On restart, it is loaded only after restoring the same authenticated account and revalidating the session with the backend. Invalid, expired, mismatched, or unauthorized state is deleted.
+
+It survives installation, update, repair, process startup, SDK initialization, game-process failure before consumption, launcher restart when the same account session remains valid, and repeated `GET /session` calls.
 
 It is cleared only when:
 
@@ -326,7 +382,11 @@ It is cleared only when:
 - logout occurs;
 - a newer context explicitly replaces it.
 
-The launcher must verify that the context game matches the game it launches before exposing it locally.
+Creating a newer context for the account atomically replaces the previous context and generates a new `context_id`. A request holding the old identifier cannot consume the replacement.
+
+The launcher exposes a context only when its account and game match a valid active launch token. Merely knowing the discovery secret is insufficient. Reading a context updates delivery diagnostics but does not change its lifecycle state.
+
+Only the context matching the active game is visible to that game. Logout clears the locally persisted context for the previous account.
 
 ## 13. Connection-string authorization
 
@@ -388,7 +448,9 @@ The plugin also contains optional server-side ticket validation and a multiplaye
 ## 19. Security requirements
 
 - Local server binds exclusively to loopback.
-- Secrets and tickets must not be logged.
+- Discovery secrets, launch tokens, tickets, and connection strings must not be logged.
+- Game-bound operations require both the discovery secret and the per-launch token.
+- The per-launch token is delivered through the launched process environment and is never stored in `launcher.json`.
 - The launcher must limit request body size and reject malformed requests.
 - Object and session identifiers are validated server-side on every mutation.
 - The backend never trusts a client-selected game slug for local game operations.
