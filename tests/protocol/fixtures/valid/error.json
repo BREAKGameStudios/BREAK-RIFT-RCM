@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "session_not_found",
+    "message": "No session is visible with that identifier.",
+    "details": {}
+  }
+}

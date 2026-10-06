@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "Session-Not-Found",
+    "message": "Invalid stable code format."
+  }
+}

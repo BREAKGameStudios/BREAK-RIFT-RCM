@@ -1,0 +1,68 @@
+[
+  {
+    "name": "unauthenticated session",
+    "schema": "session.schema.json",
+    "instance": "fixtures/valid/session-unauthenticated.json",
+    "valid": true
+  },
+  {
+    "name": "authenticated game session",
+    "schema": "session.schema.json",
+    "instance": "fixtures/valid/session-authenticated.json",
+    "valid": true
+  },
+  {
+    "name": "unauthenticated response cannot contain ticket",
+    "schema": "session.schema.json",
+    "instance": "fixtures/invalid/session-unauthenticated-ticket.json",
+    "valid": false
+  },
+  {
+    "name": "public game session",
+    "schema": "game-session.schema.json",
+    "instance": "fixtures/valid/game-session.json",
+    "valid": true
+  },
+  {
+    "name": "game session rejects zero capacity",
+    "schema": "game-session.schema.json",
+    "instance": "fixtures/invalid/game-session-zero-capacity.json",
+    "valid": false
+  },
+  {
+    "name": "pending invitation",
+    "schema": "invite.schema.json",
+    "instance": "fixtures/valid/invite.json",
+    "valid": true
+  },
+  {
+    "name": "invitation rejects unknown status",
+    "schema": "invite.schema.json",
+    "instance": "fixtures/invalid/invite-status.json",
+    "valid": false
+  },
+  {
+    "name": "join context",
+    "schema": "join-context.schema.json",
+    "instance": "fixtures/valid/join-context.json",
+    "valid": true
+  },
+  {
+    "name": "join context requires build",
+    "schema": "join-context.schema.json",
+    "instance": "fixtures/invalid/join-context-no-build.json",
+    "valid": false
+  },
+  {
+    "name": "protocol error",
+    "schema": "error.schema.json",
+    "instance": "fixtures/valid/error.json",
+    "valid": true
+  },
+  {
+    "name": "error rejects unstable code format",
+    "schema": "error.schema.json",
+    "instance": "fixtures/invalid/error-code.json",
+    "valid": false
+  }
+]
