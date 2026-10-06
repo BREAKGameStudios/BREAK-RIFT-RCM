@@ -1,7 +1,7 @@
 # RIFT Local Protocol v1
 
-Status: draft for implementation review  
-Product: RIFT Connection Manager (RCM)  
+Status: draft for implementation review
+Product: RIFT Connection Manager (RCM)
 Protocol version: `1`
 
 ## 1. Purpose
@@ -137,6 +137,7 @@ Stable local error codes:
 | `invite_not_found` | 404 | Invitation does not exist or is not visible. |
 | `invite_expired` | 409 | Invitation expired. |
 | `invite_not_pending` | 409 | Invitation was already resolved. |
+| `ticket_invalid` | 400 | Ticket is invalid, expired, consumed, or does not match its expected bindings. |
 | `launcher_busy` | 409 | A conflicting local operation is running. |
 | `backend_unavailable` | 503 | RIFT backend cannot currently be reached. |
 
@@ -153,6 +154,7 @@ Returns the current identity and creates a new disposable game ticket when authe
   "public_id": "8MCR-LXFH",
   "username": "sen11k",
   "ticket": "opaque-disposable-ticket",
+  "ticket_expires_at": "2026-10-05T20:46:00Z",
   "game": {
     "slug": "overrun-blitzkrieg",
     "build_id": "uuid"
@@ -165,7 +167,7 @@ Returns the current identity and creates a new disposable game ticket when authe
 }
 ```
 
-Required fields are `protocol_version` and `authenticated`. When `authenticated` is true, `public_id` and `username` are required. When a valid launch token is present, `ticket` and `game` are also required. `join_context` is optional. A request without a launch token may retrieve identity but receives no game ticket, game, or join context. A request that supplies an invalid or expired launch token fails with `403 invalid_launch`.
+Required fields are `protocol_version` and `authenticated`. When `authenticated` is true, `public_id` and `username` are required. When a valid launch token is present, `ticket`, `ticket_expires_at`, and `game` are also required. `join_context` is optional. A request without a launch token may retrieve identity but receives no game ticket, game, or join context. A request that supplies an invalid or expired launch token fails with `403 invalid_launch`.
 
 When no account is authenticated, the endpoint returns `200`:
 
@@ -179,6 +181,74 @@ When no account is authenticated, the endpoint returns `200`:
 Each authenticated, game-bound call issues a fresh single-use ticket bound to the account, catalog game, build, and launch context. Issuing a fresh ticket may invalidate an older unused ticket for the same account and game. SDK consumers must reject out-of-order responses and must not reuse a submitted ticket.
 
 Calling this endpoint does not consume `join_context`.
+
+### Game-ticket model
+
+A game ticket is an opaque, cryptographically random, short-lived bearer credential. The raw ticket is returned exactly once to the launcher and stored only as a cryptographic hash by the backend.
+
+Every ticket is bound to:
+
+- one account;
+- one catalog game;
+- one published build;
+- one launcher-generated launch identifier;
+- one issuance time and expiration time;
+- one active game session when the account currently hosts or has joined a session.
+
+The session binding is optional for identity-only game flows. When present, the backend verifies active membership when issuing the ticket and again when validating it.
+
+The default validity is 60 seconds. Deployments may configure a shorter duration. SDKs use `ticket_expires_at` for diagnostics and must request another ticket rather than attempting to refresh or reuse one.
+
+Issuing a new ticket invalidates any older unused ticket for the same account and game. Validation consumes the ticket atomically. Concurrent validations can produce at most one success.
+
+The backend never stores or returns the local discovery secret or launch token. It stores the opaque launch identifier only to bind issuance records and support security auditing.
+
+### Server-side ticket validation
+
+The RCM server SDK validates a ticket through the public backend operation equivalent to:
+
+```http
+POST /v1/game/tickets/validate
+Content-Type: application/json
+```
+
+```json
+{
+  "ticket": "opaque-disposable-ticket",
+  "expected_game_slug": "overrun-blitzkrieg",
+  "expected_session_id": "uuid"
+}
+```
+
+`expected_game_slug` is required and comes from trusted server configuration or, for a RIFT-launched listen server, from the active launch context. `expected_session_id` is required for session-bound multiplayer authentication and omitted only for identity-only flows.
+
+Successful validation returns:
+
+```json
+{
+  "valid": true,
+  "public_id": "8MCR-LXFH",
+  "username": "sen11k",
+  "game_slug": "overrun-blitzkrieg",
+  "build_id": "uuid",
+  "session_id": "uuid"
+}
+```
+
+`session_id` is omitted for an identity-only ticket. The backend consumes the ticket only when every expected binding matches. A game mismatch, session mismatch, expired ticket, already consumed ticket, invalid ticket, revoked membership, closed session, or inactive account returns the same public error:
+
+```json
+{
+  "error": {
+    "code": "ticket_invalid",
+    "message": "Ticket is invalid, expired, already used, or not valid for this game session."
+  }
+}
+```
+
+The uniform error prevents callers from using validation as an information oracle. Validation responses must never echo the submitted ticket.
+
+Dedicated servers that cannot inherit a launcher context require a future server-credential mechanism. Protocol v1 initially supports RIFT-launched listen servers and server deployments configured with a trusted game identity. A user access token or launcher secret must never be installed on a dedicated server.
 
 ### `POST /session/join-context/consume`
 
@@ -445,6 +515,8 @@ The Unreal implementation is the `RiftConnectionManager` plugin and exposes `URi
 
 The plugin also contains optional server-side ticket validation and a multiplayer authentication component. BLITZKRIEG removes its private `RiftSubsystem`, network authentication component, and ticket validator after adopting the plugin. Game code retains only engine-level reactions, such as starting a listen server and performing `ClientTravel` when `OnConnectionRequested` supplies an authorized opaque connection string.
 
+The current BLITZKRIEG integration must not be copied verbatim where it logs the raw game ticket. The RCM implementation may log request generations, expiration timestamps, game slug, session identifier, and success or failure codes, but never the ticket value.
+
 ## 19. Security requirements
 
 - Local server binds exclusively to loopback.
@@ -457,4 +529,3 @@ The plugin also contains optional server-side ticket validation and a multiplaye
 - Invitation acceptance and membership insertion are atomic.
 - Ticket validation consumes the ticket on first successful use.
 - Blocks deliberately hide interaction targets as not found where appropriate.
-
